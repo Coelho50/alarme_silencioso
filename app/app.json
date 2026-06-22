@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "alarme-app",
-    "slug": "alarme-app",
+    "name": "app",
+    "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "alarmeapp",
+    "scheme": "app",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
