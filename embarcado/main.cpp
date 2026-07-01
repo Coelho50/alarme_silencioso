@@ -10,16 +10,15 @@ bool isArmed = false;
 int pirSensitivity = 5000;
 unsigned long lastConfigCheck = 0;
 
-#define PIR_PIN 14      // Wired to D5 on the board
-#define LED_GREEN 12    // Wired to D6 on the board
-#define LED_RED 13      // Wired to D7 on the board
-#define BUZZER_PIN 4    // Wired to D2 on the board
+#define PIR_PIN 14
+#define LED_GREEN 12
+#define LED_RED 13
+#define BUZZER_PIN 4
 
 WiFiClient client;
 
 void fetchConfigurations() {
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Got here");
     HTTPClient http;
     String url = String(apiGateway) + "/controle/configuracoes";
     
@@ -77,12 +76,25 @@ void setup() {
   pinMode(LED_RED, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
+  // --- AM I ALIVE TEST ---
+  digitalWrite(LED_GREEN, HIGH);
+  delay(1000);
+  digitalWrite(LED_GREEN, LOW);
+  // -----------------------
+
+  Serial.println("\nConnecting to WiFi...");
   WiFi.begin(ssid, password);
+  
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    // Blink Red LED while trying to connect
+    digitalWrite(LED_RED, !digitalRead(LED_RED)); 
   }
-  Serial.println("\nWiFi Connected");
+  
+  // Turn off Red LED once connected
+  digitalWrite(LED_RED, LOW); 
+  Serial.println("\nWiFi Connected!");
 }
 
 void loop() {
