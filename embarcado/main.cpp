@@ -1,30 +1,29 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-// --- network ---
 const char* ssid = "felipeEspindola";
 const char* password = "penicilina";
-const char* apiGateway = "http://IP:3000"; // TODO: colocar ip
+const char* apiGateway = "http://10.49.54.56:3000";
 
-// --- global variables ---
 bool isArmed = false;
 int pirSensitivity = 5000;
 unsigned long lastConfigCheck = 0;
 
-// --- pins ---
-#define PIR_PIN 4
-#define LED_GREEN 12
-#define LED_YELLOW 13
-#define LED_RED 25
-#define BUZZER_PIN 26
+#define PIR_PIN 14      // Wired to D5 on the board
+#define LED_GREEN 12    // Wired to D6 on the board
+#define LED_RED 13      // Wired to D7 on the board
+#define BUZZER_PIN 4    // Wired to D2 on the board
 
-// --- http ---
+WiFiClient client;
+
 void fetchConfigurations() {
   if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Got here");
     HTTPClient http;
     String url = String(apiGateway) + "/controle/configuracoes";
-    http.begin(url);
+    
+    http.begin(client, url); 
     
     int httpResponseCode = http.GET();
     if (httpResponseCode == 200) {
@@ -44,7 +43,8 @@ void logEvent(String sensor, String eventMsg) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     String url = String(apiGateway) + "/logging/logs";
-    http.begin(url);
+    
+    http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
     
     JsonDocument doc;
@@ -59,10 +59,8 @@ void logEvent(String sensor, String eventMsg) {
   }
 }
 
-// --- helpers ---
 void resetLEDs() {
   digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_YELLOW, LOW);
   digitalWrite(LED_RED, LOW);
   digitalWrite(BUZZER_PIN, LOW);
 }
@@ -71,17 +69,14 @@ bool presenceDetected() {
   return digitalRead(PIR_PIN) == HIGH;
 }
 
-// --- setup ---
 void setup() {
   Serial.begin(115200);
   
   pinMode(PIR_PIN, INPUT);
   pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_YELLOW, OUTPUT);
   pinMode(LED_RED, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
 
-  // connect
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -91,7 +86,6 @@ void setup() {
 }
 
 void loop() {
-  // check backend for updates every 3 seconds
   if (millis() - lastConfigCheck > 3000) {
     fetchConfigurations();
     lastConfigCheck = millis();
@@ -104,7 +98,6 @@ void loop() {
   }
 
   digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_YELLOW, HIGH);
 
   if (presenceDetected()) {
     logEvent("PIR", "Movimento detectado");
