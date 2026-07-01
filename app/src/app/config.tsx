@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
 
-// Lembre-se de trocar pelo seu IP local (ex: 192.168.1.15)
-const API_URL = 'http://192.168.X.X:3000/logging/logs'; 
+const API_URL = 'http://IP:3000/logging/logs'; // TODO: colocar ip
 
 export default function LogsScreen() {
   const [logs, setLogs] = useState([]);
