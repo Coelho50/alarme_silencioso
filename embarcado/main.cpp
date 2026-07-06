@@ -3,11 +3,13 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-#include "secrets.h"
+#define WIFI_SSID "ruanito"
+#define WIFI_PASS "ruanito1234"
+#define API_GATEWAY "http://10.248.134.210:8000"
 
 bool isArmed = false;
 int alarmDelay = 5000; 
-int lightThreshold = 1000;     // O limite de luz para considerar "escuro" (ajuste entre 0 e 1023)
+int lightThreshold = 5;     // O limite de luz para considerar "escuro" (ajuste entre 0 e 1023)
 unsigned long lastConfigCheck = 0;
 
 // O LDR DEVE ser ligado no pino analógico A0 (único pino ADC do ESP8266)
