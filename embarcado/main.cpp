@@ -1,48 +1,77 @@
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 
-const char* ssid = "felipeEspindola";
-const char* password = "penicilina";
-const char* apiGateway = "http://10.49.54.56:3000";
+#include "secrets.h"
 
 bool isArmed = false;
-int pirSensitivity = 5000;
+int alarmDelay = 5000; 
+int lightThreshold = 1000;     // O limite de luz para considerar "escuro" (ajuste entre 0 e 1023)
 unsigned long lastConfigCheck = 0;
 
-#define PIR_PIN 14      // Wired to D5 on the board
-#define LED_GREEN 12    // Wired to D6 on the board
-#define LED_RED 13      // Wired to D7 on the board
-#define BUZZER_PIN 4    // Wired to D2 on the board
+// O LDR DEVE ser ligado no pino analógico A0 (único pino ADC do ESP8266)
+#define LDR_PIN A0      
+#define LED_GREEN 12    // D6
+#define LED_RED 13      // D7
+#define BUZZER_PIN 4    // D2
 
 WiFiClient client;
 
 void fetchConfigurations() {
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Got here");
     HTTPClient http;
-    String url = String(apiGateway) + "/controle/configuracoes";
+    String url = String(API_GATEWAY) + "/configuracoes";
+    
+    Serial.println("\n[DEBUG] --- Buscando Configuracoes ---");
+    Serial.print("[DEBUG] URL: "); Serial.println(url);
     
     http.begin(client, url); 
     
     int httpResponseCode = http.GET();
-    if (httpResponseCode == 200) {
-      String payload = http.getString();
-      JsonDocument doc;
-      deserializeJson(doc, payload);
-      
-      String estado = doc["estado_alarme"];
-      isArmed = (estado == "ligado");
-      pirSensitivity = doc["sensibilidade_pir"];
+    
+    Serial.print("[DEBUG] HTTP Status Code: "); Serial.println(httpResponseCode);
+    
+    if (httpResponseCode > 0) { 
+      if (httpResponseCode == 200) {
+        String payload = http.getString();
+        Serial.print("[DEBUG] Payload recebido: "); Serial.println(payload);
+        
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (error) {
+          Serial.print("[ERRO] Falha ao processar JSON: ");
+          Serial.println(error.c_str());
+        } else {
+          String estado = doc["estado_alarme"];
+          isArmed = (estado == "ligado");
+          
+          alarmDelay = doc["sensibilidade_pir"]; 
+          
+          Serial.print("[DEBUG] Estado Atualizado: "); 
+          Serial.println(isArmed ? "LIGADO" : "DESLIGADO");
+        }
+      }
+    } else {
+      Serial.print("[ERRO] Falha na conexao HTTP. Erro: ");
+      Serial.println(http.errorToString(httpResponseCode).c_str());
     }
+    
     http.end();
+    Serial.println("[DEBUG] ------------------------------\n");
+  } else {
+    Serial.println("[ERRO] WiFi Desconectado. Nao foi possivel buscar configs.");
   }
 }
 
 void logEvent(String sensor, String eventMsg) {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
-    String url = String(apiGateway) + "/logging/logs";
+    String url = String(API_GATEWAY) + "/logs";
+    
+    Serial.println("\n[DEBUG] --- Enviando Log ---");
+    Serial.print("[DEBUG] URL: "); Serial.println(url);
     
     http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
@@ -53,31 +82,52 @@ void logEvent(String sensor, String eventMsg) {
     
     String requestBody;
     serializeJson(doc, requestBody);
+    Serial.print("[DEBUG] Corpo do Envio: "); Serial.println(requestBody);
     
-    http.POST(requestBody);
+    int httpResponseCode = http.POST(requestBody);
+    
+    Serial.print("[DEBUG] HTTP Status Code: "); Serial.println(httpResponseCode);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.print("[DEBUG] Resposta do Servidor: "); Serial.println(response);
+    } else {
+      Serial.print("[ERRO] Falha no POST. Erro: ");
+      Serial.println(http.errorToString(httpResponseCode).c_str());
+    }
+    
     http.end();
+    Serial.println("[DEBUG] ------------------------------\n");
   }
 }
 
 void resetLEDs() {
   digitalWrite(LED_GREEN, LOW);
   digitalWrite(LED_RED, LOW);
-  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(BUZZER_PIN, HIGH);
 }
 
-bool presenceDetected() {
-  return digitalRead(PIR_PIN) == HIGH;
+bool isDark() {
+  int lightLevel = analogRead(LDR_PIN);
+  
+  // Descomente a linha abaixo caso precise calibrar o sensor vendo os valores reais no terminal:
+  Serial.print("[DEBUG] Nivel de luz: "); Serial.println(lightLevel);
+  
+  // Dependendo do seu módulo LDR, a leitura cai quando fica escuro.
+  // Se o seu módulo for invertido (sobe quando fica escuro), mude de '<' para '>'
+  return lightLevel < lightThreshold;
 }
 
 void setup() {
   Serial.begin(115200);
   
-  pinMode(PIR_PIN, INPUT);
+  pinMode(LDR_PIN, INPUT);
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, HIGH); // Garante o buzzer mudo no boot
 
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -99,12 +149,12 @@ void loop() {
 
   digitalWrite(LED_GREEN, LOW);
 
-  if (presenceDetected()) {
-    logEvent("PIR", "Movimento detectado");
+  if (isDark()) {
+    logEvent("LDR", "Escuridao detectada");
     digitalWrite(LED_RED, HIGH);
-    digitalWrite(BUZZER_PIN, HIGH);
+    digitalWrite(BUZZER_PIN, LOW);
     
-    delay(pirSensitivity);
+    delay(alarmDelay); // Sirene toca pelo tempo configurado no App
     
     resetLEDs();
   }
