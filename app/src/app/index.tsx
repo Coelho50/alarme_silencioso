@@ -25,7 +25,6 @@ export default function LogsScreen() {
     setRefreshing(false);
   };
 
-  // Atualiza automaticamente sempre que o usuário abre a aba de logs
   useFocusEffect(
     useCallback(() => {
       fetchLogs();

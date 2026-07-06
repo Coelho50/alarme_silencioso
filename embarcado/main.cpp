@@ -9,10 +9,9 @@
 
 bool isArmed = false;
 int alarmDelay = 5000; 
-int lightThreshold = 5;     // O limite de luz para considerar "escuro" (ajuste entre 0 e 1023)
+int lightThreshold = 5;
 unsigned long lastConfigCheck = 0;
 
-// O LDR DEVE ser ligado no pino analógico A0 (único pino ADC do ESP8266)
 #define LDR_PIN A0      
 #define LED_GREEN 12    // D6
 #define LED_RED 13      // D7
@@ -112,11 +111,8 @@ void resetLEDs() {
 bool isDark() {
   int lightLevel = analogRead(LDR_PIN);
   
-  // Descomente a linha abaixo caso precise calibrar o sensor vendo os valores reais no terminal:
   Serial.print("[DEBUG] Nivel de luz: "); Serial.println(lightLevel);
   
-  // Dependendo do seu módulo LDR, a leitura cai quando fica escuro.
-  // Se o seu módulo for invertido (sobe quando fica escuro), mude de '<' para '>'
   return lightLevel < lightThreshold;
 }
 
@@ -127,7 +123,7 @@ void setup() {
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_RED, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
-  digitalWrite(BUZZER_PIN, HIGH); // Garante o buzzer mudo no boot
+  digitalWrite(BUZZER_PIN, HIGH);
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) {
@@ -156,7 +152,7 @@ void loop() {
     digitalWrite(LED_RED, HIGH);
     digitalWrite(BUZZER_PIN, LOW);
     
-    delay(alarmDelay); // Sirene toca pelo tempo configurado no App
+    delay(alarmDelay);
     
     resetLEDs();
   }

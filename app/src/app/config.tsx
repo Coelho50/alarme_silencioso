@@ -24,19 +24,17 @@ export default function ConfigScreen() {
     try {
       const estadoNovo = isArmado ? 'ligado' : 'desligado';
 
-      // 1. Envia a alteração para o Backend (Microservice de Controle)
       const responseControle = await fetch(API_CONTROLE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           estado_alarme: estadoNovo,
-          sensibilidade_pir: 5000, // Mantido apenas para não quebrar a tabela do BD
+          sensibilidade_pir: 5000, // mantido apenas para nao quebrar a tabela do BD
           tag_autorizada: 'N/A'
         })
       });
 
       if (responseControle.ok) {
-        // 2. Registra o evento de ativação/desativação no Microservice de Logging
         await fetch(API_LOGGING, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
