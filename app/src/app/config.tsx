@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Button, StyleSheet, Switch, Alert } from 'react-native';
+import { BASE_URL } from './_api';
 
-// TODO: IP
-const API_LOGGING = 'http://10.49.54.56:3000/logging/logs';
-const API_CONTROLE = 'http://10.49.54.56:3000/controle/configuracoes';
+const API_LOGGING = `${BASE_URL}/logs`;
+const API_CONTROLE = `${BASE_URL}/configuracoes`;
 
 export default function ConfigScreen() {
   const [isArmado, setIsArmado] = useState(false);

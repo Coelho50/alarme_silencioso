@@ -5,81 +5,64 @@ const sqlite3 = require('sqlite3');
 const app = express();
 app.use(bodyParser.json());
 
-// 1. Conexão com o banco de dados próprio do serviço de controle
+// 1. Ligação à base de dados do serviço de controlo
 const db = new sqlite3.Database('./controle.db', (err) => {
     if (err) {
-        console.error('ERRO: não foi possível conectar ao SQLite (Controle).');
+        console.error('ERRO: Não foi possível ligar ao SQLite (Controlo).');
         throw err;
     }
-    console.log('Conectado ao SQLite (Controle)!');
+    console.log('Ligado ao SQLite (Controlo)!');
 });
 
-// 2. Criação da tabela de configurações
+// 2. Criação da tabela com a estrutura exata do Alarme IoT
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS configuracoes (
-        parametro TEXT PRIMARY KEY NOT NULL,
-        valor INTEGER NOT NULL
+        id INTEGER PRIMARY KEY,
+        estado_alarme TEXT NOT NULL,
+        sensibilidade_pir INTEGER NOT NULL,
+        tag_autorizada TEXT
     )`, (err) => {
         if (err) {
-            console.error('ERRO: não foi possível criar tabela de configurações.');
+            console.error('ERRO: Falha ao criar tabela de configurações.');
             throw err;
         }
     });
 
-    // 3. Inicialização de segurança: Insere o gracePeriod padrão se não existir
-    db.run(`INSERT OR IGNORE INTO configuracoes (parametro, valor) VALUES ('gracePeriod', 1000)`);
+    // Inicializa a configuração padrão (id 1) se não existir
+    db.run(`INSERT OR IGNORE INTO configuracoes (id, estado_alarme, sensibilidade_pir, tag_autorizada) 
+            VALUES (1, 'desligado', 5000, 'N/A')`);
 });
 
-// 4. Rota GET: Retorna todas as configurações
+// 3. Rota GET: O ESP8266 e o App chamam esta rota para saber o estado do alarme
 app.get('/configuracoes', (req, res) => {
-    db.all(`SELECT * FROM configuracoes`, [], (err, result) => {
+    db.get(`SELECT estado_alarme, sensibilidade_pir, tag_autorizada FROM configuracoes WHERE id = 1`, (err, result) => {
         if (err) {
             console.error("Erro ao obter configurações: " + err.message);
             return res.status(500).send('Erro ao obter dados.');
         }
+        // Devolve exatamente o que o ESP8266 e o App esperam ler
         res.status(200).json(result);
     });
 });
 
-// 5. Rota GET (por parâmetro): O ESP32 chamará esta rota para ler o gracePeriod
-app.get('/configuracoes/:parametro', (req, res) => {
-    db.get(`SELECT * FROM configuracoes WHERE parametro = ?`, [req.params.parametro], (err, result) => {
-        if (err) {
-            return res.status(500).send('Erro ao obter parâmetro.');
-        } else if (result == null) {
-            return res.status(404).send('Parâmetro não encontrado.');
-        } else {
-            res.status(200).json(result);
-        }
-    });
-});
-
-// 6. Rota PATCH: O App Mobile chamará esta rota para atualizar o gracePeriod
-app.patch('/configuracoes/:parametro', (req, res) => {
-    const { valor } = req.body;
+// 4. Rota POST: O App Móvel chama esta rota para ligar/desligar o alarme
+app.post('/configuracoes', (req, res) => {
+    const { estado_alarme, sensibilidade_pir, tag_autorizada } = req.body;
     
-    if (valor === undefined) {
-        return res.status(400).send('O valor do parâmetro é obrigatório.');
+    if (!estado_alarme) {
+        return res.status(400).send('O estado_alarme é obrigatório.');
     }
 
-    db.run(`UPDATE configuracoes SET valor = ? WHERE parametro = ?`, 
-    [valor, req.params.parametro], function(err) {
+    db.run(`UPDATE configuracoes SET estado_alarme = ?, sensibilidade_pir = ?, tag_autorizada = ? WHERE id = 1`, 
+    [estado_alarme, sensibilidade_pir || 5000, tag_autorizada || 'N/A'], function(err) {
         if (err) {
-            return res.status(500).send('Erro ao alterar o parâmetro.');
-        } else if (this.changes === 0) {
-            // Se o parâmetro não existia, nós criamos (Upsert manual)
-            db.run(`INSERT INTO configuracoes (parametro, valor) VALUES (?, ?)`, 
-            [req.params.parametro, valor], (insertErr) => {
-                if (insertErr) return res.status(500).send('Erro ao criar o parâmetro.');
-                res.status(201).send('Parâmetro criado com sucesso!');
-            });
-        } else {
-            res.status(200).send('Parâmetro atualizado com sucesso!');
+            return res.status(500).send('Erro ao atualizar o estado do alarme.');
         }
+        res.status(200).send('Alarme atualizado com sucesso!');
     });
 });
 
 // Inicia o serviço na porta 8081
 app.listen(8081, () => {
-    console.log('Serviço de Controle em execução na porta: 8081');
+    console.log('Serviço de Controlo IoT em execução na porta: 8081');
 });

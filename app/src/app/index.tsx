@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { BASE_URL } from './_api';
 
-// TODO: IP
-const API_URL = 'http://10.49.54.56:3000/logging/logs'; 
+const API_LOGGING = `${BASE_URL}/logs`;
 
 export default function LogsScreen() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -11,7 +11,7 @@ export default function LogsScreen() {
 
   const fetchLogs = async () => {
     try {
-      const response = await fetch(API_URL);
+      const response = await fetch(API_LOGGING);
       const data = await response.json();
       setLogs(data);
     } catch (error) {

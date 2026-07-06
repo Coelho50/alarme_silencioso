@@ -5,51 +5,53 @@ const sqlite3 = require('sqlite3');
 const app = express();
 app.use(bodyParser.json());
 
-// 1. Conexão com o banco de dados próprio do serviço de logging
+// 1. Ligação à base de dados do serviço de logging
 const db = new sqlite3.Database('./logs.db', (err) => {
     if (err) {
-        console.error('ERRO: não foi possível conectar ao SQLite (Logging).');
+        console.error('ERRO: Não foi possível ligar ao SQLite (Logging).');
         throw err;
     }
-    console.log('Conectado ao SQLite (Logging)!');
+    console.log('Ligado ao SQLite (Logging)!');
 });
 
-// 2. Criação da tabela de histórico
+// 2. Criação da tabela de histórico ajustada para o Alarme IoT
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS historico (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sensor TEXT NOT NULL,
-        mensagem TEXT NOT NULL,
-        data_hora TEXT NOT NULL
+        sensor_tipo TEXT NOT NULL,
+        evento TEXT NOT NULL,
+        timestamp TEXT NOT NULL
     )`, (err) => {
         if (err) {
-            console.error('ERRO: não foi possível criar tabela de histórico.');
+            console.error('ERRO: Falha ao criar tabela de histórico.');
             throw err;
         }
     });
 });
 
-// 3. Rota POST: O ESP32 chamará esta rota para registrar um evento (ex: Movimento ou Cartão lido)
+// 3. Rota POST: O ESP8266 (e o App) chamam esta rota para registar um evento
 app.post('/logs', (req, res) => {
-    const { sensor, mensagem } = req.body;
+    // Recebe as variáveis exatamente com os nomes que o App e o ESP8266 enviam
+    const { sensor_tipo, evento } = req.body;
     
-    if (!sensor || !mensagem) {
-        return res.status(400).send('Sensor e mensagem são obrigatórios.');
+    if (!sensor_tipo || !evento) {
+        return res.status(400).send('sensor_tipo e evento são obrigatórios.');
     }
 
-    const data_hora = new Date().toISOString();
+    const timestamp = new Date().toISOString();
 
-    db.run(`INSERT INTO historico (sensor, mensagem, data_hora) VALUES (?, ?, ?)`, 
-    [sensor, mensagem, data_hora], function(err) {
+    db.run(`INSERT INTO historico (sensor_tipo, evento, timestamp) VALUES (?, ?, ?)`, 
+    [sensor_tipo, evento, timestamp], function(err) {
         if (err) {
-            return res.status(500).send('Erro ao salvar o log.');
+            return res.status(500).send('Erro ao guardar o log.');
         }
-        res.status(201).send(`Log registrado com sucesso! ID: ${this.lastID}`);
+        res.status(201).send(`Log registado com sucesso! ID: ${this.lastID}`);
     });
 });
 
-// 4. Rota GET: O App Mobile chamará esta rota para ver o histórico de sensores
+// 4. Rota GET: O App Móvel chama esta rota para carregar a FlatList do histórico
 app.get('/logs', (req, res) => {
+    // Retorna ordenado do mais recente para o mais antigo
     db.all(`SELECT * FROM historico ORDER BY id DESC`, [], (err, result) => {
         if (err) {
             console.error("Erro ao obter histórico: " + err.message);
@@ -61,5 +63,5 @@ app.get('/logs', (req, res) => {
 
 // Inicia o serviço na porta 8082
 app.listen(8082, () => {
-    console.log('Serviço de Logging em execução na porta: 8082');
+    console.log('Serviço de Logging IoT em execução na porta: 8082');
 });
